@@ -1,0 +1,7 @@
+Docker Hub Image: najwanopal/wine-quality-mlops
+URL: https://hub.docker.com/r/najwanopal/wine-quality-mlops
+
+Petunjuk push:
+  docker login
+  docker build -t najwanopal/wine-quality-mlops:latest ..
+  docker push najwanopal/wine-quality-mlops:latest

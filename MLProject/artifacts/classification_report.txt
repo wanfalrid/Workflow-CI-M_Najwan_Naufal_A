@@ -1,0 +1,15 @@
+Classification Report — Wine Quality
+=======================================================
+
+              precision    recall  f1-score   support
+
+ Low Quality       0.91      0.86      0.88       862
+High Quality       0.52      0.64      0.57       202
+
+    accuracy                           0.82      1064
+   macro avg       0.71      0.75      0.73      1064
+weighted avg       0.84      0.82      0.82      1064
+
+ROC AUC: 0.8633
+
+Generated: 2026-03-19T08:28:01.231728

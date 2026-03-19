@@ -1,0 +1,20 @@
+name: wine-quality-classifier
+
+docker_env:
+  image: najwanopal/wine-quality-mlops:latest
+
+entry_points:
+  main:
+    parameters:
+      data_dir: {type: str, default: "winequality_preprocessing"}
+      n_estimators: {type: int, default: 100}
+      max_depth: {type: int, default: 10}
+      random_state: {type: int, default: 42}
+      experiment_name: {type: str, default: "wine-quality-classification"}
+    command: >
+      python modelling.py
+        --data-dir {data_dir}
+        --n-estimators {n_estimators}
+        --max-depth {max_depth}
+        --random-state {random_state}
+        --experiment-name {experiment_name}
