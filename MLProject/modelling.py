@@ -30,14 +30,13 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, roc_curve, precision_recall_curve,
-    average_precision_score, confusion_matrix, classification_report,
+    average_precision_score, classification_report,
     ConfusionMatrixDisplay,
 )
 
@@ -63,9 +62,9 @@ def load_data(data_dir: str) -> tuple:
     """Load preprocessed train/test data."""
     log.info(f"Loading data: {data_dir}")
     X_train = pd.read_csv(os.path.join(data_dir, "X_train.csv"))
-    X_test  = pd.read_csv(os.path.join(data_dir, "X_test.csv"))
+    X_test = pd.read_csv(os.path.join(data_dir, "X_test.csv"))
     y_train = pd.read_csv(os.path.join(data_dir, "y_train.csv")).squeeze()
-    y_test  = pd.read_csv(os.path.join(data_dir, "y_test.csv")).squeeze()
+    y_test = pd.read_csv(os.path.join(data_dir, "y_test.csv")).squeeze()
 
     log.info(f"  X_train: {X_train.shape}  X_test: {X_test.shape}")
     log.info(f"  y_train: 0={int((y_train==0).sum())} 1={int((y_train==1).sum())}")
@@ -94,28 +93,28 @@ def create_model(n_estimators, max_depth, random_state):
 def log_metrics_manual(model, X_train, X_test, y_train, y_test, training_time):
     """Manual logging of ALL metrics to MLflow active run."""
 
-    y_train_pred  = model.predict(X_train)
+    y_train_pred = model.predict(X_train)
     y_train_proba = model.predict_proba(X_train)[:, 1]
-    y_test_pred   = model.predict(X_test)
-    y_test_proba  = model.predict_proba(X_test)[:, 1]
+    y_test_pred = model.predict(X_test)
+    y_test_proba = model.predict_proba(X_test)[:, 1]
 
     metrics = {
         # Train
-        "training_accuracy":  accuracy_score(y_train, y_train_pred),
+        "training_accuracy": accuracy_score(y_train, y_train_pred),
         "training_precision": precision_score(y_train, y_train_pred, average="weighted", zero_division=0),
-        "training_recall":    recall_score(y_train, y_train_pred, average="weighted", zero_division=0),
-        "training_f1":        f1_score(y_train, y_train_pred, average="weighted", zero_division=0),
-        "training_roc_auc":   roc_auc_score(y_train, y_train_proba),
+        "training_recall": recall_score(y_train, y_train_pred, average="weighted", zero_division=0),
+        "training_f1": f1_score(y_train, y_train_pred, average="weighted", zero_division=0),
+        "training_roc_auc": roc_auc_score(y_train, y_train_proba),
         # Test
-        "test_accuracy":      accuracy_score(y_test, y_test_pred),
-        "test_precision":     precision_score(y_test, y_test_pred, average="weighted", zero_division=0),
-        "test_recall":        recall_score(y_test, y_test_pred, average="weighted", zero_division=0),
-        "test_f1":            f1_score(y_test, y_test_pred, average="weighted", zero_division=0),
-        "test_roc_auc":       roc_auc_score(y_test, y_test_proba),
+        "test_accuracy": accuracy_score(y_test, y_test_pred),
+        "test_precision": precision_score(y_test, y_test_pred, average="weighted", zero_division=0),
+        "test_recall": recall_score(y_test, y_test_pred, average="weighted", zero_division=0),
+        "test_f1": f1_score(y_test, y_test_pred, average="weighted", zero_division=0),
+        "test_roc_auc": roc_auc_score(y_test, y_test_proba),
         # Binary (class 1)
         "test_precision_binary": precision_score(y_test, y_test_pred, zero_division=0),
-        "test_recall_binary":    recall_score(y_test, y_test_pred, zero_division=0),
-        "test_f1_binary":        f1_score(y_test, y_test_pred, zero_division=0),
+        "test_recall_binary": recall_score(y_test, y_test_pred, zero_division=0),
+        "test_f1_binary": f1_score(y_test, y_test_pred, zero_division=0),
         # Time
         "training_time_seconds": training_time,
     }
@@ -124,7 +123,7 @@ def log_metrics_manual(model, X_train, X_test, y_train, y_test, training_time):
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring="f1")
     metrics["cv_f1_mean"] = cv_scores.mean()
-    metrics["cv_f1_std"]  = cv_scores.std()
+    metrics["cv_f1_std"] = cv_scores.std()
 
     mlflow.log_metrics(metrics)
     log.info("  Metrics logged:")
@@ -331,6 +330,7 @@ def main():
         report = log_artifacts(
             model, X_test, y_test, y_pred, y_proba, feature_names, metrics
         )
+        log.info(f"Report generated: {len(report)} chars")
 
         # ── Save model locally ──────────────────────────────────────
         os.makedirs(os.path.join(BASE_DIR, "models"), exist_ok=True)
