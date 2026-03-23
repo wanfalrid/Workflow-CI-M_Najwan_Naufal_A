@@ -1,7 +1,28 @@
-Docker Hub Image: najwanopal/wine-quality-mlops
-URL: https://hub.docker.com/r/najwanopal/wine-quality-mlops
+Docker Hub Image untuk Wine Quality MLflow Project
+==================================================
 
-Petunjuk push:
-  docker login
-  docker build -t najwanopal/wine-quality-mlops:latest ..
-  docker push najwanopal/wine-quality-mlops:latest
+Image Name : wanfalrid/wine-quality-mlflow
+Docker Hub : https://hub.docker.com/r/wanfalrid/wine-quality-mlflow
+
+Tags:
+  - latest              (selalu versi terbaru)
+  - <commit-sha>        (per commit — di-tag otomatis oleh CI)
+  - <run-number>        (per CI run)
+
+Pull:
+  docker pull wanfalrid/wine-quality-mlflow:latest
+
+Run:
+  docker run -it wanfalrid/wine-quality-mlflow:latest
+
+Run dengan custom parameters:
+  docker run -it wanfalrid/wine-quality-mlflow:latest \
+    --data-dir winequality_preprocessing \
+    --n-estimators 200 \
+    --max-depth 15 \
+    --random-state 42
+
+Build manual:
+  cd Workflow-CI/
+  docker build -t wanfalrid/wine-quality-mlflow:latest .
+  docker push wanfalrid/wine-quality-mlflow:latest

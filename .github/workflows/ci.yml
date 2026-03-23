@@ -1,73 +1,56 @@
-# ──────────────────────────────────────────────────────────────────
-#  GitHub Actions CI — Wine Quality MLflow Project
-#  Student: M_Najwan_Naufal_A
-# ──────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
+#  GitHub Actions CI/CD — Wine Quality MLflow Project (ADVANCE)
+#  Student: M_Najwan_Naufal_A — Dicoding SMSML
+# ──────────────────────────────────────────────────────────────────────
+#
+#  Pipeline: lint-and-test → build-docker → train-model → save-artifacts
+#
+# ──────────────────────────────────────────────────────────────────────
 
-name: ML Training CI Pipeline
+name: ML Training CI/CD Pipeline
 
 on:
   push:
     branches: [main]
+
   pull_request:
     branches: [main]
+
   workflow_dispatch:
     inputs:
       n_estimators:
-        description: "Number of trees"
+        description: "Number of trees in RandomForest"
         required: false
         default: "100"
       max_depth:
-        description: "Max tree depth (0=None)"
+        description: "Max tree depth (0 = None)"
         required: false
         default: "10"
+      experiment_name:
+        description: "MLflow experiment name"
+        required: false
+        default: "wine-quality-classification"
+
+  schedule:
+    # Setiap hari Minggu jam 02:00 UTC
+    - cron: "0 2 * * 0"
 
 env:
   PYTHON_VERSION: "3.10"
-  DOCKER_IMAGE: "najwanopal/wine-quality-mlops"
+  DOCKER_IMAGE: "${{ secrets.DOCKERHUB_USERNAME }}/wine-quality-mlflow"
 
+# ══════════════════════════════════════════════════════════════════════
+#  JOB 1: Lint & Test
+# ══════════════════════════════════════════════════════════════════════
 jobs:
-  # ════════════════════════════════════════════════════════════════
-  #  Job 1: Lint & Validate
-  # ════════════════════════════════════════════════════════════════
-  lint:
-    name: Lint & Validate
+  lint-and-test:
+    name: "🔍 Lint & Test"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install lint tools
-        run: pip install flake8
-
-      - name: Lint modelling.py
-        run: flake8 MLProject/modelling.py --max-line-length=120 --ignore=E501,W503
-
-      - name: Validate MLProject file
-        run: |
-          echo "=== MLProject ==="
-          cat MLProject/MLProject
-          echo ""
-          echo "=== Checking required files ==="
-          test -f MLProject/MLProject && echo "✅ MLProject"
-          test -f MLProject/modelling.py && echo "✅ modelling.py"
-          test -f MLProject/conda.yaml && echo "✅ conda.yaml"
-          test -d MLProject/winequality_preprocessing && echo "✅ winequality_preprocessing/"
-
-  # ════════════════════════════════════════════════════════════════
-  #  Job 2: Train Model
-  # ════════════════════════════════════════════════════════════════
-  train:
-    name: Train Model
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -76,62 +59,106 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('MLProject/conda.yaml') }}
-          restore-keys: ${{ runner.os }}-pip-
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('MLProject/conda.yaml') }}
+          restore-keys: ${{ runner.os }}-pip-lint-
 
-      - name: Install dependencies
+      - name: Install lint & test tools
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy scikit-learn mlflow matplotlib seaborn joblib optuna
+          pip install flake8 pytest pandas numpy scikit-learn mlflow
 
-      - name: Run training
-        working-directory: MLProject
-        env:
-          MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
+      - name: Lint with flake8
         run: |
-          python modelling.py \
-            --data-dir winequality_preprocessing \
-            --n-estimators ${{ github.event.inputs.n_estimators || '100' }} \
-            --max-depth ${{ github.event.inputs.max_depth || '10' }} \
-            --random-state 42 \
-            --experiment-name wine-quality-classification
+          echo "=== Flake8 Lint Check ==="
+          flake8 MLProject/modelling.py \
+            --max-line-length=120 \
+            --ignore=E501,W503,E402 \
+            --statistics \
+            --count
+          echo "✅ Lint passed"
 
-      - name: Verify outputs
-        working-directory: MLProject
+      - name: Validate project structure
         run: |
-          echo "=== Checking artifacts ==="
-          ls -la artifacts/ || echo "No artifacts dir"
-          ls -la models/ || echo "No models dir"
-          echo ""
-          echo "=== Model metadata ==="
-          cat models/metadata.json
+          echo "=== Validating MLProject structure ==="
+          ERRORS=0
 
-      - name: Upload training artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: training-artifacts-${{ github.run_number }}
-          path: |
-            MLProject/artifacts/
-            MLProject/models/
-          retention-days: 14
+          for file in MLProject/MLProject MLProject/modelling.py MLProject/conda.yaml; do
+            if [ -f "$file" ]; then
+              echo "✅ $file"
+            else
+              echo "❌ MISSING: $file"
+              ERRORS=$((ERRORS+1))
+            fi
+          done
 
-      - name: Upload MLflow runs
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlflow-runs-${{ github.run_number }}
-          path: /tmp/mlruns/
-          retention-days: 7
+          if [ -d "MLProject/winequality_preprocessing" ]; then
+            FILE_COUNT=$(ls MLProject/winequality_preprocessing/*.csv 2>/dev/null | wc -l)
+            echo "✅ winequality_preprocessing/ ($FILE_COUNT CSV files)"
+          else
+            echo "❌ MISSING: winequality_preprocessing/"
+            ERRORS=$((ERRORS+1))
+          fi
 
-  # ════════════════════════════════════════════════════════════════
-  #  Job 3: Build & Push Docker Image
-  # ════════════════════════════════════════════════════════════════
-  docker:
-    name: Build & Push Docker
+          if [ -f "Dockerfile" ]; then
+            echo "✅ Dockerfile"
+          else
+            echo "❌ MISSING: Dockerfile"
+            ERRORS=$((ERRORS+1))
+          fi
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "⛔ $ERRORS errors found"
+            exit 1
+          fi
+          echo "✅ All project files validated"
+
+      - name: Run unit tests
+        run: |
+          echo "=== Running basic validation tests ==="
+          python -c "
+          import pandas as pd, os, sys
+
+          data_dir = 'MLProject/winequality_preprocessing'
+          files = ['X_train.csv', 'X_test.csv', 'y_train.csv', 'y_test.csv']
+          passed = 0
+
+          for f in files:
+              path = os.path.join(data_dir, f)
+              df = pd.read_csv(path)
+              assert len(df) > 0, f'{f} is empty'
+              assert df.isnull().sum().sum() == 0, f'{f} has missing values'
+              print(f'✅ {f}: {df.shape}')
+              passed += 1
+
+          # Check train/test consistency
+          X_train = pd.read_csv(os.path.join(data_dir, 'X_train.csv'))
+          X_test = pd.read_csv(os.path.join(data_dir, 'X_test.csv'))
+          assert list(X_train.columns) == list(X_test.columns), 'Column mismatch'
+          print(f'✅ Column consistency check passed')
+          passed += 1
+
+          print(f'\n🎯 {passed}/{passed} tests passed')
+          "
+
+  # ══════════════════════════════════════════════════════════════════
+  #  JOB 2: Build & Push Docker Image
+  # ══════════════════════════════════════════════════════════════════
+  build-docker:
+    name: "🐳 Build & Push Docker"
     runs-on: ubuntu-latest
-    needs: train
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [lint-and-test]
+    # Hanya build Docker pada push ke main (bukan PR atau schedule)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_sha: ${{ github.sha }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -139,42 +166,291 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & Push
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=sha
+            type=raw,value=latest
+            type=raw,value=${{ github.run_number }}
+
+      - name: Build & Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:latest
-            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Image Summary
+      - name: Print image info
         run: |
           echo "### 🐳 Docker Image Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.DOCKER_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.DOCKER_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`${{ env.DOCKER_IMAGE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run | \`${{ github.run_number }}\` |" >> $GITHUB_STEP_SUMMARY
 
-  # ════════════════════════════════════════════════════════════════
-  #  Job 4: Create Issue on Failure
-  # ════════════════════════════════════════════════════════════════
-  notify-on-failure:
-    name: Notify on Failure
+  # ══════════════════════════════════════════════════════════════════
+  #  JOB 3: Train Model (MLflow + DagsHub)
+  # ══════════════════════════════════════════════════════════════════
+  train-model:
+    name: "🧠 Train Model"
     runs-on: ubuntu-latest
-    needs: [lint, train]
+    needs: [build-docker]
+    # Jika build-docker di-skip (PR), tetap jalan setelah lint
+    if: always() && needs.lint-and-test.result != 'failure'
+    outputs:
+      run_id: ${{ steps.train.outputs.run_id }}
+      test_f1: ${{ steps.train.outputs.test_f1 }}
+
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-train-${{ hashFiles('MLProject/conda.yaml') }}
+          restore-keys: ${{ runner.os }}-pip-train-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn mlflow dagshub \
+                      matplotlib seaborn joblib optuna
+
+      - name: Train model
+        id: train
+        working-directory: MLProject
+        env:
+          N_ESTIMATORS: ${{ github.event.inputs.n_estimators || '100' }}
+          MAX_DEPTH: ${{ github.event.inputs.max_depth || '10' }}
+          EXPERIMENT: ${{ github.event.inputs.experiment_name || 'wine-quality-classification' }}
+        run: |
+          echo "=== Training Parameters ==="
+          echo "  n_estimators: $N_ESTIMATORS"
+          echo "  max_depth:    $MAX_DEPTH"
+          echo "  experiment:   $EXPERIMENT"
+          echo ""
+
+          # Fallback: jika tidak ada DagsHub secrets, gunakan local tracking
+          if [ -z "$MLFLOW_TRACKING_URI" ]; then
+            export MLFLOW_TRACKING_URI="file:///tmp/mlruns"
+            echo "⚠️  No MLFLOW_TRACKING_URI set, using local: $MLFLOW_TRACKING_URI"
+          fi
+
+          python modelling.py \
+            --data-dir winequality_preprocessing \
+            --n-estimators "$N_ESTIMATORS" \
+            --max-depth "$MAX_DEPTH" \
+            --random-state 42 \
+            --experiment-name "$EXPERIMENT"
+
+          # Extract metrics from metadata for GitHub outputs
+          if [ -f models/metadata.json ]; then
+            RUN_ID=$(python -c "import json; d=json.load(open('models/metadata.json')); print(d['run_id'])")
+            TEST_F1=$(python -c "import json; d=json.load(open('models/metadata.json')); print(d['metrics']['test_f1'])")
+            echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "test_f1=$TEST_F1" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "=== Results ==="
+            echo "  Run ID:  $RUN_ID"
+            echo "  Test F1: $TEST_F1"
+          fi
+
+      - name: Generate training summary
+        if: always()
+        working-directory: MLProject
+        run: |
+          echo "### 🧠 Training Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f models/metadata.json ]; then
+            python -c "
+          import json
+          d = json.load(open('models/metadata.json'))
+          print('| Metric | Value |')
+          print('|--------|-------|')
+          for k, v in sorted(d['metrics'].items()):
+              print(f'| \`{k}\` | {v:.4f} |')
+          print()
+          print(f'**Run ID:** \`{d[\"run_id\"]}\`')
+          " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No metadata found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: training-artifacts-${{ github.run_number }}
+          path: |
+            MLProject/artifacts/
+            MLProject/models/
+          retention-days: 14
+
+  # ══════════════════════════════════════════════════════════════════
+  #  JOB 4: Save Artifacts & Create Release
+  # ══════════════════════════════════════════════════════════════════
+  save-artifacts:
+    name: "💾 Save Artifacts"
+    runs-on: ubuntu-latest
+    needs: [train-model]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download training artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: training-artifacts-${{ github.run_number }}
+          path: training-output/
+
+      - name: Commit model artifacts
+        run: |
+          # Buat folder trained_models/
+          mkdir -p trained_models
+
+          # Copy hasil training
+          cp -r training-output/models/* trained_models/ 2>/dev/null || true
+          cp -r training-output/artifacts/* trained_models/ 2>/dev/null || true
+
+          # List files
+          echo "=== Files to commit ==="
+          find trained_models/ -type f -exec ls -lh {} \;
+
+          # Git commit
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add trained_models/
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Update trained model artifacts [skip ci]
+
+            Run: #${{ github.run_number }}
+            F1 Score: ${{ needs.train-model.outputs.test_f1 }}
+            Run ID: ${{ needs.train-model.outputs.run_id }}
+            Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git push
+            echo "✅ Artifacts committed"
+          fi
+
+      - name: Create GitHub Release
+        if: needs.train-model.outputs.test_f1 != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const f1 = '${{ needs.train-model.outputs.test_f1 }}';
+            const runId = '${{ needs.train-model.outputs.run_id }}';
+            const tag = `v${{ github.run_number }}-f1-${parseFloat(f1).toFixed(3)}`;
+
+            // Create tag
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tag}`,
+                sha: context.sha
+              });
+            } catch(e) {
+              console.log('Tag may already exist:', e.message);
+            }
+
+            // Create release
+            try {
+              await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tag,
+                name: `Model Release ${tag}`,
+                body: `## 🧠 Model Training Results\n\n` +
+                      `| Metric | Value |\n|--------|-------|\n` +
+                      `| Test F1 | ${f1} |\n` +
+                      `| MLflow Run ID | \`${runId}\` |\n` +
+                      `| CI Run | #${{ github.run_number }} |\n\n` +
+                      `Trained by GitHub Actions CI/CD pipeline.`,
+                draft: false,
+                prerelease: false
+              });
+              console.log(`✅ Release created: ${tag}`);
+            } catch(e) {
+              console.log('Release creation note:', e.message);
+            }
+
+      - name: Summary
+        run: |
+          echo "### 💾 Artifacts Saved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Model committed to \`trained_models/\`" >> $GITHUB_STEP_SUMMARY
+          echo "- F1 Score: \`${{ needs.train-model.outputs.test_f1 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Run ID: \`${{ needs.train-model.outputs.run_id }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ══════════════════════════════════════════════════════════════════
+  #  JOB 5: Notify on Failure
+  # ══════════════════════════════════════════════════════════════════
+  notify-on-failure:
+    name: "🚨 Notify on Failure"
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, train-model]
     if: failure()
     permissions:
       issues: write
+
     steps:
       - name: Create GitHub Issue
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const title = `🚨 CI Pipeline Failed — Run #${context.runNumber}`;
+            const body = [
+              '## CI Pipeline Failure',
+              '',
+              `**Run:** [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              `**Trigger:** \`${context.eventName}\``,
+              `**Branch:** \`${context.ref}\``,
+              `**Commit:** \`${context.sha.substring(0, 7)}\``,
+              `**Timestamp:** \`${new Date().toISOString()}\``,
+              '',
+              '### Failed Jobs',
+              `- lint-and-test: \`${{ needs.lint-and-test.result }}\``,
+              `- train-model: \`${{ needs.train-model.result }}\``,
+              '',
+              '### Steps to Debug',
+              '1. Check the [workflow logs](' + context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + ')',
+              '2. Fix the failing step',
+              '3. Push the fix to trigger a new run',
+            ].join('\n');
+
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🚨 CI Pipeline Failed — Run #${context.runNumber}`,
-              body: `## CI Pipeline Failure\n\n**Run:** [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n**Trigger:** \`${context.eventName}\`\n**Branch:** \`${context.ref}\`\n\nPlease check the logs.`,
-              labels: ['bug', 'ci']
+              title, body,
+              labels: ['bug', 'ci-failure']
             });

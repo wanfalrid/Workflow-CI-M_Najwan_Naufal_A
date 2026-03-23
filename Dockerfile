@@ -3,14 +3,14 @@
 #  Student: M_Najwan_Naufal_A
 # ──────────────────────────────────────────────────────────────────
 #
-#  Build:  docker build -t najwanopal/wine-quality-mlops:latest .
-#  Push:   docker push najwanopal/wine-quality-mlops:latest
-#  Run:    docker run -it najwanopal/wine-quality-mlops:latest
+#  Build:  docker build -t wanfalrid/wine-quality-mlops:latest .
+#  Push:   docker push wanfalrid/wine-quality-mlops:latest
+#  Run:    docker run -it wanfalrid/wine-quality-mlops:latest
 # ──────────────────────────────────────────────────────────────────
 
 FROM python:3.10-slim
 
-LABEL maintainer="M_Najwan_Naufal_A <najwanopal>"
+LABEL maintainer="M_Najwan_Naufal_A <wanfalrid>"
 LABEL description="Wine Quality MLflow Project — Binary Classification"
 LABEL version="1.0"
 

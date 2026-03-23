@@ -1,36 +1,62 @@
 # Workflow-CI — Wine Quality ML Training Pipeline
 
-![CI Pipeline](https://github.com/najwanopal/Workflow-CI/actions/workflows/ci.yml/badge.svg)
-[![Docker Image](https://img.shields.io/docker/v/najwanopal/wine-quality-mlops?label=Docker%20Hub&color=blue)](https://hub.docker.com/r/najwanopal/wine-quality-mlops)
+![CI/CD Pipeline](https://github.com/wanfalrid/Workflow-CI/actions/workflows/ci.yml/badge.svg)
+[![Docker Image](https://img.shields.io/docker/v/wanfalrid/wine-quality-mlflow?label=Docker%20Hub&color=blue)](https://hub.docker.com/r/wanfalrid/wine-quality-mlflow)
 
 **Student:** M_Najwan_Naufal_A  
-**Username Dicoding:** najwanopal  
+**Username Dicoding:** wanfalrid  
 **Course:** Membangun Sistem Machine Learning — Dicoding
 
 ---
 
 ## 📋 Deskripsi
 
-Repository ini berisi **MLflow Project** untuk melatih model klasifikasi biner Wine Quality.  
-Pipeline CI/CD menggunakan **GitHub Actions** untuk otomatisasi training dan Docker image build.
+Repository ini berisi **MLflow Project** + **GitHub Actions CI/CD Pipeline** untuk melatih model klasifikasi biner Wine Quality secara otomatis.
 
-### Arsitektur CI/CD
+---
+
+## 🔄 Workflow Diagram
 
 ```
-Push ke main
-    │
-    ├── [Job 1] Lint & Validate
-    │       └── flake8 + cek file
-    │
-    ├── [Job 2] Train Model
-    │       ├── Install dependencies
-    │       ├── Run modelling.py (manual MLflow logging)
-    │       ├── Generate artifacts (5 plots + report)
-    │       └── Upload artifacts
-    │
-    └── [Job 3] Build & Push Docker
-            ├── docker build
-            └── docker push → Docker Hub
+┌──────────────────────────────────────────────────────────────────────┐
+│                    TRIGGERS                                          │
+│  • push ke main  • PR ke main  • manual dispatch  • weekly schedule  │
+└─────────────────────────┬────────────────────────────────────────────┘
+                          │
+                          ▼
+               ┌─────────────────────┐
+               │ JOB 1: Lint & Test  │
+               │  • flake8 lint      │
+               │  • structure check  │
+               │  • data validation  │
+               └──────────┬──────────┘
+                          │ ✅
+              ┌───────────┴───────────┐
+              │                       │
+              ▼                       ▼
+   ┌──────────────────┐    ┌──────────────────┐
+   │ JOB 2: Docker    │    │ JOB 3: Train     │
+   │  • build image   │───▶│  • setup DagsHub │
+   │  • push to Hub   │    │  • mlflow run    │
+   │  • tag sha+latest│    │  • log metrics   │
+   └──────────────────┘    └──────┬───────────┘
+                                  │ ✅
+                                  ▼
+                       ┌──────────────────┐
+                       │ JOB 4: Save      │
+                       │  • commit model  │
+                       │  • GitHub Release│
+                       └──────────────────┘
+                                  │
+                           ┌──────┴──────┐
+                           │ (on failure)│
+                           ▼             │
+                  ┌──────────────┐       │
+                  │ JOB 5: Alert │       │
+                  │ create issue │       │
+                  └──────────────┘       │
+                                         ▼
+                                      ✅ DONE
 ```
 
 ---
@@ -40,146 +66,115 @@ Push ke main
 ```
 Workflow-CI/
 ├── .github/workflows/
-│   └── ci.yml                          ← GitHub Actions workflow
+│   └── ci.yml                          ← CI/CD pipeline (5 jobs)
 ├── MLProject/
 │   ├── MLProject                       ← MLflow Project config
-│   ├── modelling.py                    ← Training script (manual logging)
+│   ├── modelling.py                    ← Training (manual MLflow logging)
 │   ├── conda.yaml                      ← Conda environment spec
-│   ├── DockerHub.txt                   ← Docker Hub link
+│   ├── DockerHub.txt                   ← Docker Hub image info
 │   └── winequality_preprocessing/      ← Data siap latih
 │       ├── X_train.csv
 │       ├── X_test.csv
 │       ├── y_train.csv
 │       └── y_test.csv
-├── Dockerfile                          ← Docker image untuk training
+├── Dockerfile                          ← Docker image
+├── secrets_setup_guide.md              ← Panduan GitHub Secrets
 └── README.md                           ← Dokumentasi ini
 ```
 
 ---
 
+## 🔐 GitHub Secrets
+
+| Secret | Deskripsi | Contoh |
+|--------|-----------|--------|
+| `DOCKERHUB_USERNAME` | Username Docker Hub | `wanfalrid` |
+| `DOCKERHUB_TOKEN` | Access token Docker Hub | `dckr_pat_xxx` |
+| `DAGSHUB_USERNAME` | Username DagsHub | `wanfalrid` |
+| `DAGSHUB_TOKEN` | Access token DagsHub | `a1b2c3d4e5` |
+| `MLFLOW_TRACKING_URI` | MLflow server URL | `https://dagshub.com/wanfalrid/...mlflow` |
+
+> Lihat **[secrets_setup_guide.md](secrets_setup_guide.md)** untuk panduan lengkap.
+
+---
+
 ## 🚀 Cara Menjalankan
 
-### 1. Jalankan MLProject Lokal (Standalone)
+### Trigger CI via GitHub Actions
+
+**Otomatis:**
+- Push ke `main` → pipeline jalan
+- Setiap Minggu 02:00 UTC → scheduled run
+
+**Manual Dispatch:**
+1. Buka tab **Actions** di GitHub
+2. Pilih **ML Training CI/CD Pipeline**
+3. Klik **Run workflow**
+4. Isi `n_estimators`, `max_depth` (opsional)
+5. Klik **Run workflow**
+
+### Jalankan Lokal
 
 ```bash
 cd MLProject
 
-# Default parameters
+# Default
 python modelling.py
 
 # Custom parameters
 python modelling.py \
-    --data-dir winequality_preprocessing \
     --n-estimators 200 \
     --max-depth 15 \
-    --random-state 42 \
-    --experiment-name wine-quality-classification
+    --random-state 42
 ```
 
-### 2. Jalankan via MLflow CLI
+### Docker
 
 ```bash
-# Dari root Workflow-CI/
-mlflow run MLProject \
-    -P n_estimators=200 \
-    -P max_depth=15
+# Build
+docker build -t wanfalrid/wine-quality-mlflow:latest .
 
-# Dengan Docker
-mlflow run MLProject \
-    --env-manager=local \
-    -P n_estimators=200
-```
-
-### 3. Jalankan via Docker
-
-```bash
-# Build image
-docker build -t najwanopal/wine-quality-mlops:latest .
-
-# Run training
-docker run -it najwanopal/wine-quality-mlops:latest
-
-# Custom parameters
-docker run -it najwanopal/wine-quality-mlops:latest \
-    --data-dir winequality_preprocessing \
-    --n-estimators 200 \
-    --max-depth 15
+# Run
+docker run -it wanfalrid/wine-quality-mlflow:latest \
+    --n-estimators 200 --max-depth 15
 ```
 
 ---
 
-## 🔄 Trigger GitHub Actions
+## 📊 Output Artifacts
 
-### Otomatis
-- **Push** ke branch `main` → CI pipeline jalan otomatis
-- **Pull Request** ke branch `main` → lint + training
-
-### Manual (Workflow Dispatch)
-1. Buka tab **Actions** di GitHub repo
-2. Pilih workflow **ML Training CI Pipeline**
-3. Klik **Run workflow**
-4. (Opsional) Isi `n_estimators` dan `max_depth`
-5. Klik **Run workflow**
-
----
-
-## 🐳 Docker Hub
-
-- **Image:** [`najwanopal/wine-quality-mlops`](https://hub.docker.com/r/najwanopal/wine-quality-mlops)
-- **Tags:** `latest`, `<commit-sha>`
-
-### Push ke Docker Hub (manual)
-
-```bash
-docker login
-docker build -t najwanopal/wine-quality-mlops:latest .
-docker push najwanopal/wine-quality-mlops:latest
-```
-
-### GitHub Secrets yang Diperlukan
-
-| Secret | Deskripsi |
-|--------|-----------|
-| `DOCKERHUB_USERNAME` | Username Docker Hub |
-| `DOCKERHUB_TOKEN` | Access Token Docker Hub |
-
----
-
-## 📊 CI Pipeline Output
-
-Setiap run menghasilkan:
-
-| Artifact | Deskripsi |
-|----------|-----------|
+| File | Deskripsi |
+|------|-----------|
 | `confusion_matrix.png` | Confusion matrix |
 | `roc_curve.png` | ROC curve + AUC |
 | `pr_curve.png` | Precision-Recall curve |
 | `feature_importance.png` | Feature importance |
-| `classification_report.txt` | Classification report |
-| `model.pkl` | Trained model |
-| `metadata.json` | Run metadata + metrics |
+| `classification_report.txt` | Full classification report |
+| `model.pkl` | Trained model pickle |
+| `metadata.json` | Parameters, metrics, run info |
 
 ---
 
-## 📝 MLflow Manual Logging
+## 📝 Manual MLflow Logging
 
-Script ini menggunakan **manual logging** (BUKAN autolog) sesuai syarat Advanced:
+Script menggunakan **100% manual logging** (BUKAN `mlflow.sklearn.autolog()`):
 
 ```python
-# Parameters — logged manually
+# Parameters
 mlflow.log_param("n_estimators", 100)
-mlflow.log_param("max_depth", 10)
 
-# Metrics — logged manually
+# Metrics
 mlflow.log_metric("test_accuracy", 0.85)
-mlflow.log_metric("test_f1", 0.67)
+mlflow.log_metric("test_f1", 0.77)
+mlflow.log_metric("training_time_seconds", 2.5)
 
-# Tags — logged manually
+# Tags
 mlflow.set_tag("experiment_type", "mlproject-training")
+mlflow.set_tag("mlflow.source.type", "LOCAL")
 
-# Model — logged manually
+# Model
 mlflow.sklearn.log_model(model, artifact_path="model")
 
-# Artifacts — logged manually
-mlflow.log_artifact("confusion_matrix.png", "plots")
+# Custom artifacts
+mlflow.log_artifact("roc_curve.png", "plots")
 ```

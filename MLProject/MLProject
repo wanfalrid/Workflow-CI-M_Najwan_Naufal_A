@@ -1,7 +1,7 @@
 name: wine-quality-classifier
 
 docker_env:
-  image: najwanopal/wine-quality-mlops:latest
+  image: wanfalrid/wine-quality-mlops:latest
 
 entry_points:
   main:
