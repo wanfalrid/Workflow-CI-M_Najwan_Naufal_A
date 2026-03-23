@@ -1,0 +1,44 @@
+{
+  "model_name": "RandomForestClassifier",
+  "run_id": "d508d980956146cda53453e7aa45dcec",
+  "params": {
+    "n_estimators": "100",
+    "max_depth": "10",
+    "random_state": "42",
+    "class_weight": "balanced",
+    "n_jobs": "-1"
+  },
+  "metrics": {
+    "training_accuracy": 0.9093,
+    "training_precision": 0.9328,
+    "training_recall": 0.9093,
+    "training_f1": 0.9147,
+    "training_roc_auc": 0.9739,
+    "test_accuracy": 0.8177,
+    "test_precision": 0.8363,
+    "test_recall": 0.8177,
+    "test_f1": 0.825,
+    "test_roc_auc": 0.8633,
+    "test_precision_binary": 0.5159,
+    "test_recall_binary": 0.6436,
+    "test_f1_binary": 0.5727,
+    "training_time_seconds": 0.2981,
+    "cv_f1_mean": 0.5564,
+    "cv_f1_std": 0.0289
+  },
+  "features": [
+    "fixed acidity",
+    "volatile acidity",
+    "citric acid",
+    "residual sugar",
+    "chlorides",
+    "free sulfur dioxide",
+    "total sulfur dioxide",
+    "density",
+    "pH",
+    "sulphates",
+    "alcohol",
+    "wine_type"
+  ],
+  "timestamp": "2026-03-23T08:11:31.854500"
+}
