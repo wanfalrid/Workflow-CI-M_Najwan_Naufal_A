@@ -1,6 +1,6 @@
 {
   "model_name": "RandomForestClassifier",
-  "run_id": "d508d980956146cda53453e7aa45dcec",
+  "run_id": "8d5255cdace14a3fafb0a974e83f73f6",
   "params": {
     "n_estimators": "100",
     "max_depth": "10",
@@ -22,7 +22,7 @@
     "test_precision_binary": 0.5159,
     "test_recall_binary": 0.6436,
     "test_f1_binary": 0.5727,
-    "training_time_seconds": 0.2981,
+    "training_time_seconds": 0.2804,
     "cv_f1_mean": 0.5564,
     "cv_f1_std": 0.0289
   },
@@ -40,5 +40,5 @@
     "alcohol",
     "wine_type"
   ],
-  "timestamp": "2026-03-23T08:11:31.854500"
+  "timestamp": "2026-03-24T06:12:18.208446"
 }
